@@ -82,6 +82,29 @@ def build_vector_store(pdf_text):
     qdrant = load_qdrant()
     qdrant.add_texts(pdf_text)
 
+def build_qa_model(llm):
+    qdrant = load_qdrant()
+    retriever = qdrant.as_retriever(
+        # "mmr", "similarity_score_threshold" などもある
+        search_type="similarity",
+        # 文書を何個取得するか (default: 4)
+        search_kwargs={"k": 10},
+    )
+    return RetrievalQA.from_chain_type(
+        llm=llm,
+        chain_type="stuff",
+        retriever=retriever,
+        return_source_documents=True,
+        verbose=True,
+    )
+
+def ask(qa, query):
+    with get_openai_callback() as cb:
+        # query / result / source_documents
+        answer = qa(query)
+
+    return answer, cb.total_cost
+
 def page_pdf_upload_and_build_vector_db():
     st.title("PDF Upload")
     container = st.container()
@@ -93,7 +116,30 @@ def page_pdf_upload_and_build_vector_db():
 
 def page_ask_my_pdf():
     st.title("Ask My PDFs")
-    st.write("TODO: Not implemented yet")
+
+    llm = select_model()
+    container = st.container()
+    response_container = st.container()
+
+    with container:
+        query = st.text_input("Query: ", key="input")
+        if not query:
+            answer = None
+        else:
+            qa = build_qa_model(llm)
+            if qa:
+                with st.spinner("ChatGPT is typing ..."):
+                    answer, cost = ask(qa, query)
+                st.session_state.costs.append(cost)
+            else:
+                answer = None
+
+        if answer:
+            with response_container:
+                st.markdown("## Answer")
+                st.write(answer['result'])
+                st.markdown("## Source Documents")
+                st.write(answer['source_documents'])
 
 def main():
     init_page()
