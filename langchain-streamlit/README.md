@@ -26,3 +26,9 @@ Youtube Summarizer
 ```sh
 streamlit run youtube_summarizer.py
 ```
+
+Ask my PDFs
+
+```sh
+streamlit run ask_my_pdfs.py
+```
